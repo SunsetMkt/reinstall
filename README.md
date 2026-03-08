@@ -144,7 +144,7 @@ certutil -urlcache -f -split https://cnb.cool/bin456789/reinstall/-/git/raw/main
 >
 > 此功能会清除当前系统**整个硬盘**的全部数据（包含其它分区）！
 >
-> 数据无价，请三思而后行！
+> 如果不小心运行了脚本，可以在重启前运行 `bash reinstall.sh reset` 取消重装
 
 - 用户名为 `root`，脚本会提示输入密码，不输入则使用随机密码
 - 安装最新版可不输入版本号
@@ -231,7 +231,7 @@ bash reinstall.sh ubuntu --installer
 >
 > 此功能会清除当前系统**整个硬盘**的全部数据（包含其它分区）！
 >
-> 数据无价，请三思而后行！
+> 如果不小心运行了脚本，可以在重启前运行 `bash reinstall.sh reset` 取消重装
 
 - 支持 `raw` 和固定大小的 `vhd` 镜像。未压缩或者压缩成 `.gz` `.xz` `.zst` `.tar` `.tar.gz` `.tar.xz` `.tar.zst`
 - DD Windows 镜像时，会自动扩展系统盘，静态 IP 的机器会配置好 IP，可能首次开机几分钟后才生效
@@ -324,7 +324,7 @@ bash reinstall.sh netboot.xyz
 >
 > 此功能会清除当前系统**整个硬盘**的全部数据（包含其它分区）！
 >
-> 数据无价，请三思而后行！
+> 如果不小心运行了脚本，可以在重启前运行 `bash reinstall.sh reset` 取消重装
 
 - 用户名为 `administrator`，脚本会提示输入密码，不输入则使用随机密码
 - 如果远程登录失败，可以尝试使用用户名 `.\administrator`

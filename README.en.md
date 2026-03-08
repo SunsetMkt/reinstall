@@ -144,7 +144,7 @@ certutil -urlcache -f -split https://cnb.cool/bin456789/reinstall/-/git/raw/main
 >
 > This feature will erase **the entire hard disk** of the current system (including other partitions)!
 >
-> Data is priceless — please think twice before proceeding!
+> If the script was run by mistake, you can run `bash reinstall.sh reset` before rebooting to cancel the reinstallation operation.
 
 - Username `root`. The script prompts for a password. If left blank, a random one is generated.
 - When installing the latest version, the version number does not need to be specified.
@@ -231,7 +231,7 @@ bash reinstall.sh ubuntu --installer
 >
 > This feature will erase **the entire hard disk** of the current system (including other partitions)!
 >
-> Data is priceless — please think twice before proceeding!
+> If the script was run by mistake, you can run `bash reinstall.sh reset` before rebooting to cancel the reinstallation operation.
 
 - Supports `raw` and fixed-size `vhd` image formats. Either uncompressed or compressed as `.gz`, `.xz`, `.zst`, `.tar`, `.tar.gz`, `.tar.xz`, `.tar.zst`.
 - When deploy a Windows image, the system disk will be automatically expanded, and machines with a static IP will have their IP configured, and may take a few minutes after the first boot for the configuration to take effect.
@@ -324,7 +324,7 @@ bash reinstall.sh netboot.xyz
 >
 > This feature will erase **the entire hard disk** of the current system (including other partitions)!
 >
-> Data is priceless — please think twice before proceeding!
+> If the script was run by mistake, you can run `bash reinstall.sh reset` before rebooting to cancel the reinstallation operation.
 
 - Username `administrator`. The script prompts for a password. If left blank, a random one is generated.
 - If remote login fails, try using the username `.\administrator`.
