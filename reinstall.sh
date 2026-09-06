@@ -75,6 +75,10 @@ else
 fi
 
 usage_and_exit() {
+
+    # kali 官网的 202x.x iso 安装后，apt 源是 rolling
+    # 因此 netboot last-snapshot 没有意义
+    # 因此这里不显示 last-snapshot|rolling
     cat <<EOF
 Usage: $reinstall_____ anolis      7|8|23
                        opencloudos 8|9|23
@@ -1507,7 +1511,7 @@ Continue?
                 # https://www.kali.org/docs/general-use/kali-apt-sources/
                 hostname=kali.download
             fi
-            codename=kali-rolling
+            codename=kali-$releasever
             mirror=http://$hostname/kali/dists/$codename/main/installer-$basearch_alt/current/images/netboot/debian-installer/$basearch_alt
 
             is_virt && flavour=-cloud || flavour=
@@ -2190,8 +2194,8 @@ verify_os_name() {
         'alpine      3.21|3.22|3.23|3.24' \
         'openeuler   20.03|22.03|24.03' \
         'ubuntu      18.04|20.04|22.04|24.04|26.04' \
+        'kali        last-snapshot|rolling' \
         'redhat' \
-        'kali' \
         'arch' \
         'gentoo' \
         'aosc' \
@@ -3857,6 +3861,27 @@ EOF
         curl -Lo cdrom/simple-cdd/kali.postinst https://gitlab.com/kalilinux/build-scripts/kali-live/-/raw/main/kali-config/common/includes.installer/kali-finish-install?ref_type=heads
         chmod a+x cdrom/simple-cdd/kali.postinst
     fi
+
+    # 安装 kali-last-snapshot 时
+    # 要将以下几处的 kali-rolling 替换为 kali-last-snapshot
+    # 注意系统安装后 /etc/apt/sources.list.d/kali.sources 依然是 kali-rolling
+    # kali-linux-202x.x-installer-netinst-amd64.iso 安装后也是 kali-rolling
+    # 而微软商店的 kali 的 kali.sources 是 kali-last-snapshot
+    if [ "$distro" = kali ] && [ "$releasever" = last-snapshot ]; then
+        sed -i "s/kali-rolling/kali-last-snapshot/" \
+            preseed.cfg \
+            etc/default-release \
+            etc/udebs-source
+    fi
+
+    # 无论是 netboot kali-last-snapshot 还是 kali-linux-202x.x-installer-netinst-amd64.iso
+    # tasksel 安装 openssh-server 时已经在用 /target 的源了，也就是 kali-rolling
+    # 我们遇到过 kali-rolling 的 openssh-server 有问题无法安装
+    # https://bugs.kali.org/view.php?id=9847
+    # https://bugs.kali.org/view.php?id=9853
+    # 如果要规避这种情况，或者要纯血 kali-last-snapshot
+    # debootstrap 后马上修改 apt 源应该可以做到
+    # 相关位置 /usr/lib/post-base-installer.d/
 
     if [ "$distro" = debian ] && is_debian_elts; then
         curl -Lo usr/share/keyrings/debian-archive-keyring.gpg https://deb.freexian.com/extended-lts/archive-key.gpg
