@@ -361,17 +361,20 @@ download() {
 update_part() {
     sleep 1
     sync
+    sleep 1
 
     # partprobe
     # 有分区挂载中会报 Resource busy 错误
     if is_have_cmd partprobe; then
         partprobe /dev/$xda 2>/dev/null || true
+        sleep 1
     fi
 
     # partx
     # https://access.redhat.com/solutions/199573
     if is_have_cmd partx; then
         partx -u /dev/$xda
+        sleep 1
     fi
 
     # mdev
@@ -380,6 +383,7 @@ update_part() {
     # 因此要先停止 mdev 服务
     # 还要删除 /dev/$xda*?
     ensure_service_stopped mdev
+    sleep 1
     # 即使停止了 mdev，有时也会报 Directory not empty，因此添加 retry
     retry 5 rm -rf /dev/disk/*
 
@@ -387,6 +391,7 @@ update_part() {
     # modprobe: can't change directory to '/lib/modules': No such file or directory
     # 因此强制不显示上面的提示
     mdev -sf 2>/dev/null
+    sleep 1
     ensure_service_started mdev 2>/dev/null
     sleep 1
 }
@@ -673,13 +678,6 @@ is_virt_contains() {
 }
 
 is_dmi_contains() {
-    # Manufacturer: Alibaba Cloud
-    # Manufacturer: Tencent Cloud
-    # Manufacturer: Huawei Cloud
-    # Asset Tag: OracleCloud.com
-    # Vendor: Amazon EC2
-    # Manufacturer: Amazon EC2
-    # Asset Tag: Amazon EC2
     cache_dmi_and_virt
     echo "$_dmi" | grep -Eiwq "$1"
 }
@@ -2903,8 +2901,8 @@ create_part() {
     # shellcheck disable=SC2154
     if [ "$distro" = windows ]; then
         if ! size_bytes=$(get_link_file_size "$iso"); then
-            # 默认值，目前最大的 iso 小于 8g
-            size_bytes=$((8 * 1024 * 1024 * 1024))
+            # 默认值，目前最大的 iso 小于 10g
+            size_bytes=$((10 * 1024 * 1024 * 1024))
         fi
 
         # 按iso容量计算分区大小
@@ -5363,8 +5361,18 @@ install_qcow_by_copy() {
                 fi
                 chroot_dnf install efibootmgr grub2-efi-$arch shim-$arch
             fi
-            # openeuler arm 25.09 云镜像里面的 grubaa64.efi 是用于 mbr 分区表，$root 是 hd0,msdos1
-            # 因此要重新下载 $root 是 hd0,gpt1 的 grubaa64.efi
+
+            # openeuler arm 云镜像里面的 grubaa64.efi 有问题
+
+            # 1. 会自动进入 rescue 模式
+            # set 命令输出如下
+            # fw_path='(hd0,gpt1)//EFI/openEuler'
+            # prefix='(hd0,msdos1)/efi/EFI/openEuler'
+            # root='hd0,msdos1'
+            # 将 msdos1 改成 gpt1 后才能加载 normal 正常引导
+
+            # 2. 不是来自 grub2-efi-aa64 rpm
+            # 因此重新下载 $root 是 hd0,gpt1 的 grubaa64.efi
             if $need_reinstall_grub_efi; then
                 chroot_dnf reinstall grub2-efi-$arch
             fi
@@ -5704,6 +5712,7 @@ EOF
     # centos/rocky/almalinux/rhel: xfs
     # oracle x86_64:          lvm + xfs
     # oracle aarch64 cloud:   xfs
+    # openeuler x64/arm:      mbr 分区表 + ext4
     # alibaba cloud linux 3:  ext4
 
     is_lvm_image=false
@@ -6361,6 +6370,15 @@ get_cloud_vendor() {
     # busybox blkid 不显示 sr0 的 UUID
     apk add lsblk
 
+    # Manufacturer: Alibaba Cloud
+    # Manufacturer: Tencent Cloud
+    # Manufacturer: Huawei Cloud
+    # Asset Tag: OracleCloud.com
+    # Vendor: Amazon EC2
+    # Manufacturer: Amazon EC2
+    # Asset Tag: Amazon EC2
+    # Asset Tag: HUAWEICLOUD
+
     # http://git.annexia.org/?p=virt-what.git;a=blob;f=virt-what.in;hb=HEAD
     # virt-what 可识别厂商 aws google_cloud alibaba_cloud alibaba_cloud-ebm
     if is_dmi_contains "Amazon EC2" || is_virt_contains aws; then
@@ -6369,16 +6387,16 @@ get_cloud_vendor() {
         echo gcp
     elif is_dmi_contains "OracleCloud"; then
         echo oracle
-    elif is_dmi_contains "7783-7084-3265-9085-8269-3286-77"; then
-        echo azure
-    elif lsblk -o UUID,LABEL | grep -i 9796-932E | grep -iq config-2; then
-        echo ibm
-    elif is_dmi_contains 'Huawei Cloud'; then
+    elif is_dmi_contains 'HUAWEICLOUD'; then
         echo huawei
     elif is_dmi_contains 'Alibaba Cloud'; then
         echo aliyun
     elif is_dmi_contains 'Tencent Cloud'; then
         echo qcloud
+    elif is_dmi_contains "7783-7084-3265-9085-8269-3286-77"; then
+        echo azure
+    elif lsblk -o UUID,LABEL | grep -i 9796-932E | grep -iq config-2; then
+        echo ibm
     fi
 }
 
@@ -6985,7 +7003,7 @@ install_windows() {
             ;;
         azure)
             # inf 不限版本，未测试
-            if [ "$arch_wim" = x86 ] || [ "$arch_wim" = x86_64 ]; then
+            if [ "$arch_wim" = x86_64 ]; then
                 add_driver_azure
             fi
             ;;
@@ -7313,14 +7331,21 @@ EOF
         cp_drivers $drv/xen/.Drivers
     }
 
-    # citrix xen
+    # 社区版
+    # https://xenbits.xenproject.org/pvdrivers/win/ 未签名
+    # https://github.com/xcp-ng/win-pv-drivers/releases
+
+    # 商业版
     # https://pvupdates.vmd.citrix.com/updates.json 7.2.0.1555
     # https://pvupdates.vmd.citrix.com/updates.v9.json 9.3.3.125
     # https://pvupdates.vmd.citrix.com/autoupdate.v1.json 9.3.3.125
-    # https://pvupdates.vmd.citrix.com/autoupdate.v2.json 9.4.0.146
-    # https://support.citrix.com/s/article/CTX235403-updates-to-xenserver-vm-tools-for-windows-for-xenserver-and-citrix-hypervisor
+    # https://pvupdates.vmd.citrix.com/autoupdate.v2.json 9.6.0.19
+    # https://pvupdates.vmd.citrix.com/ 9.6.0.19
+    # https://www.xenserver.com/downloads 9.6.0.xx
+    # https://docs.xenserver.com/en-us/xenserver/9/vms/windows/vm-tools
+    # https://web.archive.org/web/20230830234619/https://support.citrix.com/article/CTX235403/updates-to-citrix-vm-tools-for-windows-for-xenserver-and-citrix-hypervisor
 
-    # 最高版本
+    # 最高版本?
     # 2012 r2   9.3.1
     # 2012      9.3.0
     # 2008 (r2) 7.2.0.1555
@@ -7489,6 +7514,8 @@ EOF
         *)
             # 先获取最新版本号，再下载
             # 用 stable-virtio 的话国内镜像下载的可能是缓存的旧版
+
+            # anubis 默认策略拉黑了华为云，连验证的机会都没有
 
             # https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/
             # 路径是网页，可能会弹出 anubis 验证
@@ -7738,8 +7765,13 @@ EOF
         info "Add drivers: GCP"
 
         # https://packages.cloud.google.com/yuck/repos/google-compute-engine-stable/index
-        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-gvnic-gq-stable/index
-        # 官方镜像的 gvnic 是从 gvnic-gq-stable 获取的，版本低一点，但更稳定?
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-gvnic-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-gga-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-netkvm-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-balloon-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-pvpanic-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-vioscsi-stable/index
+        # https://packages.cloud.google.com/yuck/repos/google-compute-engine-driver-nvme-stable/index
 
         mkdir -p $drv/gce
         gce_repo=https://packages.cloud.google.com/yuck
